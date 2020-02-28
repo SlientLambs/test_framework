@@ -1,0 +1,63 @@
+import json
+import unittest
+import libs.requests as requests
+from bin.config import *
+from urllib import parse
+from libs.ddt import ddt, data
+from lib.untils import test_data
+from lib.rely import get_headers, get_user_list, form_data, form_params
+
+
+@ddt
+class Test%(class_name)s(unittest.TestCase):
+    @data(*test_data['%(file_name)s']['%(sheet_name)s'])
+    def test_%(test_method)s(self, case):
+        method = case['method']
+        check = case['check']
+        checks = check.split(';')
+        user = case['desc']
+        user_list = get_user_list()
+        self._testMethodDoc = case['desc']
+
+        name = ''
+        for u in user_list:
+            if 'admin' in user:
+                name = 'admin'
+                break
+            else:
+                if u in user:
+                    name = u
+
+        url = parse.urljoin(HOST, case['url'])
+
+        if 'login' in case['id']:
+            headers = HEADERS
+        else:
+            headers = get_headers(name)
+
+        payload = ''
+        params = ''
+
+        if method == 'POST':
+            payload = form_data(case['data'])
+        else:
+            params = form_params(case['data'])
+
+        response = requests.request(method, url, headers=headers,
+                                    data=payload.encode('utf-8'),
+                                    params=params)
+        content = response.json()
+        result = json.dumps(content, ensure_ascii=False).replace('": ', '=')
+
+        for c in checks:
+            if '$e' in c:
+                expert_result = form_data(c)[0]
+                actual_result = form_data(c)[1]
+                self.assertEqual(expert_result, actual_result)
+            else:
+                c = form_data(c)
+                self.assertIn(c, result)
+
+
+if __name__ == '__main__':
+    unittest.main()
